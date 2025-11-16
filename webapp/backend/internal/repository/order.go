@@ -68,7 +68,7 @@ func (r *OrderRepository) GetShippingOrders(ctx context.Context) ([]model.Order,
 
 func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.ListRequest) ([]model.Order, int, error) {
 
-    // --- 构建 WHERE ---
+    // 构建 WHERE
     whereParts := []string{"o.user_id = ?"}
     args := []interface{}{userID}
 
@@ -84,18 +84,10 @@ func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.
 
     whereClause := "WHERE " + strings.Join(whereParts, " AND ")
 
-    // --- 排序字段转换（防 SQL 注入） ---
-    validSortFields := map[string]string{
-        "order_id":       "o.order_id",
-        "product_name":   "p.name",
-        "created_at":     "o.created_at",
-        "arrived_at":     "o.arrived_at",
-        "shipped_status": "o.shipped_status",
-    }
-
-    sortField, ok := validSortFields[req.SortField]
-    if !ok {
-        sortField = "o.order_id"
+    // 排序
+    sortField := req.SortField
+    if sortField == "" {
+        sortField = "order_id"
     }
 
     sortOrder := strings.ToUpper(req.SortOrder)
@@ -103,13 +95,13 @@ func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.
         sortOrder = "ASC"
     }
 
-    orderClause := "ORDER BY " + sortField + " " + sortOrder + ", o.order_id ASC"
+    orderClause := "ORDER BY " + sortField + " " + sortOrder + ", order_id ASC"
 
-    // --- LIMIT / OFFSET ---
+    // 分页
     limitClause := "LIMIT ? OFFSET ?"
     argsWithPaging := append(append([]interface{}{}, args...), req.PageSize, req.Offset)
 
-    // --- 主查询 ---
+    // 主查询
     query := `
         SELECT 
             o.order_id,
@@ -138,13 +130,15 @@ func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.
     if err := r.db.SelectContext(ctx, &rows, query, argsWithPaging...); err != nil {
         return nil, 0, err
     }
+    
 
-    // --- COUNT(*) 获取总数 ---
+    // 查询总数
     countQuery := `
         SELECT COUNT(*)
         FROM orders o
         JOIN products p ON o.product_id = p.product_id
     ` + whereClause
+
     countQuery = r.db.Rebind(countQuery)
 
     var total int
@@ -152,16 +146,16 @@ func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.
         return nil, 0, err
     }
 
-    // --- 转换成 model.Order ---
+    // 映射
     orders := make([]model.Order, 0, len(rows))
-    for _, r2 := range rows {
+    for _, o := range rows {
         orders = append(orders, model.Order{
-            OrderID:       r2.OrderID,
-            ProductID:     r2.ProductID,
-            ProductName:   r2.ProductName,
-            ShippedStatus: r2.ShippedStatus,
-            CreatedAt:     r2.CreatedAt.Time,
-            ArrivedAt:     r2.ArrivedAt,
+            OrderID:       o.OrderID,
+            ProductID:     o.ProductID,
+            ProductName:   o.ProductName,
+            ShippedStatus: o.ShippedStatus,
+            CreatedAt:     o.CreatedAt.Time,
+            ArrivedAt:     o.ArrivedAt,
         })
     }
 
