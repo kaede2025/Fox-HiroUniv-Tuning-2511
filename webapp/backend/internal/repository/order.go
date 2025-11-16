@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
+	// "sort"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -65,122 +65,223 @@ func (r *OrderRepository) GetShippingOrders(ctx context.Context) ([]model.Order,
 }
 
 // 注文履歴一覧を取得
+// func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.ListRequest) ([]model.Order, int, error) {
+// 	query := `
+//         SELECT order_id, product_id, shipped_status, created_at, arrived_at
+//         FROM orders
+//         WHERE user_id = ?
+//     `
+// 	type orderRow struct {
+// 		OrderID       int          `db:"order_id"`
+// 		ProductID     int          `db:"product_id"`
+// 		ShippedStatus string       `db:"shipped_status"`
+// 		CreatedAt     sql.NullTime `db:"created_at"`
+// 		ArrivedAt     sql.NullTime `db:"arrived_at"`
+// 	}
+// 	var ordersRaw []orderRow
+// 	if err := r.db.SelectContext(ctx, &ordersRaw, query, userID); err != nil {
+// 		return nil, 0, err
+// 	}
+
+// 	var orders []model.Order
+// 	for _, o := range ordersRaw {
+// 		var productName string
+// 		if err := r.db.GetContext(ctx, &productName, "SELECT name FROM products WHERE product_id = ?", o.ProductID); err != nil {
+// 			return nil, 0, err
+// 		}
+// 		if req.Search != "" {
+// 			if req.Type == "prefix" {
+// 				if !strings.HasPrefix(productName, req.Search) {
+// 					continue
+// 				}
+// 			} else {
+// 				if !strings.Contains(productName, req.Search) {
+// 					continue
+// 				}
+// 			}
+// 		}
+// 		orders = append(orders, model.Order{
+// 			OrderID:       int64(o.OrderID),
+// 			ProductID:     o.ProductID,
+// 			ProductName:   productName,
+// 			ShippedStatus: o.ShippedStatus,
+// 			CreatedAt:     o.CreatedAt.Time,
+// 			ArrivedAt:     o.ArrivedAt,
+// 		})
+// 	}
+
+// 	switch req.SortField {
+// 	case "product_name":
+// 		if strings.ToUpper(req.SortOrder) == "DESC" {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				return orders[i].ProductName > orders[j].ProductName
+// 			})
+// 		} else {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				return orders[i].ProductName < orders[j].ProductName
+// 			})
+// 		}
+// 	case "created_at":
+// 		if strings.ToUpper(req.SortOrder) == "DESC" {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				return orders[i].CreatedAt.After(orders[j].CreatedAt)
+// 			})
+// 		} else {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				return orders[i].CreatedAt.Before(orders[j].CreatedAt)
+// 			})
+// 		}
+// 	case "shipped_status":
+// 		if strings.ToUpper(req.SortOrder) == "DESC" {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				return orders[i].ShippedStatus > orders[j].ShippedStatus
+// 			})
+// 		} else {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				return orders[i].ShippedStatus < orders[j].ShippedStatus
+// 			})
+// 		}
+// 	case "arrived_at":
+// 		if strings.ToUpper(req.SortOrder) == "DESC" {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				if orders[i].ArrivedAt.Valid && orders[j].ArrivedAt.Valid {
+// 					return orders[i].ArrivedAt.Time.After(orders[j].ArrivedAt.Time)
+// 				}
+// 				return orders[i].ArrivedAt.Valid
+// 			})
+// 		} else {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				if orders[i].ArrivedAt.Valid && orders[j].ArrivedAt.Valid {
+// 					return orders[i].ArrivedAt.Time.Before(orders[j].ArrivedAt.Time)
+// 				}
+// 				return orders[j].ArrivedAt.Valid
+// 			})
+// 		}
+// 	case "order_id":
+// 		fallthrough
+// 	default:
+// 		if strings.ToUpper(req.SortOrder) == "DESC" {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				return orders[i].OrderID > orders[j].OrderID
+// 			})
+// 		} else {
+// 			sort.SliceStable(orders, func(i, j int) bool {
+// 				return orders[i].OrderID < orders[j].OrderID
+// 			})
+// 		}
+// 	}
+
+// 	total := len(orders)
+// 	start := req.Offset
+// 	end := req.Offset + req.PageSize
+// 	if start > total {
+// 		start = total
+// 	}
+// 	if end > total {
+// 		end = total
+// 	}
+// 	pagedOrders := orders[start:end]
+
+// 	return pagedOrders, total, nil
+// }
 func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.ListRequest) ([]model.Order, int, error) {
-	query := `
-        SELECT order_id, product_id, shipped_status, created_at, arrived_at
-        FROM orders
-        WHERE user_id = ?
-    `
-	type orderRow struct {
-		OrderID       int          `db:"order_id"`
-		ProductID     int          `db:"product_id"`
-		ShippedStatus string       `db:"shipped_status"`
-		CreatedAt     sql.NullTime `db:"created_at"`
-		ArrivedAt     sql.NullTime `db:"arrived_at"`
-	}
-	var ordersRaw []orderRow
-	if err := r.db.SelectContext(ctx, &ordersRaw, query, userID); err != nil {
-		return nil, 0, err
-	}
 
-	var orders []model.Order
-	for _, o := range ordersRaw {
-		var productName string
-		if err := r.db.GetContext(ctx, &productName, "SELECT name FROM products WHERE product_id = ?", o.ProductID); err != nil {
-			return nil, 0, err
-		}
-		if req.Search != "" {
-			if req.Type == "prefix" {
-				if !strings.HasPrefix(productName, req.Search) {
-					continue
-				}
-			} else {
-				if !strings.Contains(productName, req.Search) {
-					continue
-				}
-			}
-		}
-		orders = append(orders, model.Order{
-			OrderID:       int64(o.OrderID),
-			ProductID:     o.ProductID,
-			ProductName:   productName,
-			ShippedStatus: o.ShippedStatus,
-			CreatedAt:     o.CreatedAt.Time,
-			ArrivedAt:     o.ArrivedAt,
-		})
-	}
+    // --- 构建 WHERE ---
+    whereParts := []string{"o.user_id = ?"}
+    args := []interface{}{userID}
 
-	switch req.SortField {
-	case "product_name":
-		if strings.ToUpper(req.SortOrder) == "DESC" {
-			sort.SliceStable(orders, func(i, j int) bool {
-				return orders[i].ProductName > orders[j].ProductName
-			})
-		} else {
-			sort.SliceStable(orders, func(i, j int) bool {
-				return orders[i].ProductName < orders[j].ProductName
-			})
-		}
-	case "created_at":
-		if strings.ToUpper(req.SortOrder) == "DESC" {
-			sort.SliceStable(orders, func(i, j int) bool {
-				return orders[i].CreatedAt.After(orders[j].CreatedAt)
-			})
-		} else {
-			sort.SliceStable(orders, func(i, j int) bool {
-				return orders[i].CreatedAt.Before(orders[j].CreatedAt)
-			})
-		}
-	case "shipped_status":
-		if strings.ToUpper(req.SortOrder) == "DESC" {
-			sort.SliceStable(orders, func(i, j int) bool {
-				return orders[i].ShippedStatus > orders[j].ShippedStatus
-			})
-		} else {
-			sort.SliceStable(orders, func(i, j int) bool {
-				return orders[i].ShippedStatus < orders[j].ShippedStatus
-			})
-		}
-	case "arrived_at":
-		if strings.ToUpper(req.SortOrder) == "DESC" {
-			sort.SliceStable(orders, func(i, j int) bool {
-				if orders[i].ArrivedAt.Valid && orders[j].ArrivedAt.Valid {
-					return orders[i].ArrivedAt.Time.After(orders[j].ArrivedAt.Time)
-				}
-				return orders[i].ArrivedAt.Valid
-			})
-		} else {
-			sort.SliceStable(orders, func(i, j int) bool {
-				if orders[i].ArrivedAt.Valid && orders[j].ArrivedAt.Valid {
-					return orders[i].ArrivedAt.Time.Before(orders[j].ArrivedAt.Time)
-				}
-				return orders[j].ArrivedAt.Valid
-			})
-		}
-	case "order_id":
-		fallthrough
-	default:
-		if strings.ToUpper(req.SortOrder) == "DESC" {
-			sort.SliceStable(orders, func(i, j int) bool {
-				return orders[i].OrderID > orders[j].OrderID
-			})
-		} else {
-			sort.SliceStable(orders, func(i, j int) bool {
-				return orders[i].OrderID < orders[j].OrderID
-			})
-		}
-	}
+    if req.Search != "" {
+        if req.Type == "prefix" {
+            whereParts = append(whereParts, "p.name LIKE ?")
+            args = append(args, req.Search+"%")
+        } else {
+            whereParts = append(whereParts, "p.name LIKE ?")
+            args = append(args, "%"+req.Search+"%")
+        }
+    }
 
-	total := len(orders)
-	start := req.Offset
-	end := req.Offset + req.PageSize
-	if start > total {
-		start = total
-	}
-	if end > total {
-		end = total
-	}
-	pagedOrders := orders[start:end]
+    whereClause := "WHERE " + strings.Join(whereParts, " AND ")
 
-	return pagedOrders, total, nil
+    // --- 排序字段转换（防 SQL 注入） ---
+    validSortFields := map[string]string{
+        "order_id":       "o.order_id",
+        "product_name":   "p.name",
+        "created_at":     "o.created_at",
+        "arrived_at":     "o.arrived_at",
+        "shipped_status": "o.shipped_status",
+    }
+
+    sortField, ok := validSortFields[req.SortField]
+    if !ok {
+        sortField = "o.order_id"
+    }
+
+    sortOrder := strings.ToUpper(req.SortOrder)
+    if sortOrder != "ASC" && sortOrder != "DESC" {
+        sortOrder = "ASC"
+    }
+
+    orderClause := "ORDER BY " + sortField + " " + sortOrder + ", o.order_id ASC"
+
+    // --- LIMIT / OFFSET ---
+    limitClause := "LIMIT ? OFFSET ?"
+    argsWithPaging := append(append([]interface{}{}, args...), req.PageSize, req.Offset)
+
+    // --- 主查询 ---
+    query := `
+        SELECT 
+            o.order_id,
+            o.product_id,
+            p.name AS product_name,
+            o.shipped_status,
+            o.created_at,
+            o.arrived_at
+        FROM orders o
+        JOIN products p ON o.product_id = p.product_id
+        ` + whereClause + `
+        ` + orderClause + `
+        ` + limitClause
+
+    query = r.db.Rebind(query)
+
+    var rows []struct {
+        OrderID       int64         `db:"order_id"`
+        ProductID     int           `db:"product_id"`
+        ProductName   string        `db:"product_name"`
+        ShippedStatus string        `db:"shipped_status"`
+        CreatedAt     sql.NullTime  `db:"created_at"`
+        ArrivedAt     sql.NullTime  `db:"arrived_at"`
+    }
+
+    if err := r.db.SelectContext(ctx, &rows, query, argsWithPaging...); err != nil {
+        return nil, 0, err
+    }
+
+    // --- COUNT(*) 获取总数 ---
+    countQuery := `
+        SELECT COUNT(*)
+        FROM orders o
+        JOIN products p ON o.product_id = p.product_id
+    ` + whereClause
+    countQuery = r.db.Rebind(countQuery)
+
+    var total int
+    if err := r.db.GetContext(ctx, &total, countQuery, args...); err != nil {
+        return nil, 0, err
+    }
+
+    // --- 转换成 model.Order ---
+    orders := make([]model.Order, 0, len(rows))
+    for _, r2 := range rows {
+        orders = append(orders, model.Order{
+            OrderID:       r2.OrderID,
+            ProductID:     r2.ProductID,
+            ProductName:   r2.ProductName,
+            ShippedStatus: r2.ShippedStatus,
+            CreatedAt:     r2.CreatedAt.Time,
+            ArrivedAt:     r2.ArrivedAt,
+        })
+    }
+
+    return orders, total, nil
 }

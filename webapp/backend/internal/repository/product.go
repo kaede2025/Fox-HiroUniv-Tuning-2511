@@ -13,38 +13,46 @@ func NewProductRepository(db DBTX) *ProductRepository {
 	return &ProductRepository{db: db}
 }
 
-// 商品一覧を全件取得し、アプリケーション側でページング処理を行う
+// 商品一覧を指定した部分を取得します
 func (r *ProductRepository) ListProducts(ctx context.Context, userID int, req model.ListRequest) ([]model.Product, int, error) {
-	var products []model.Product
-	baseQuery := `
-		SELECT product_id, name, value, weight, image, description
-		FROM products
-	`
-	args := []interface{}{}
+    var products []model.Product
 
-	if req.Search != "" {
-		baseQuery += " WHERE (name LIKE ? OR description LIKE ?)"
-		searchPattern := "%" + req.Search + "%"
-		args = append(args, searchPattern, searchPattern)
-	}
+    // --- Build WHERE ---
+    whereClause := ""
+    args := []interface{}{}
+    if req.Search != "" {
+        whereClause = " WHERE (name LIKE ? OR description LIKE ?)"
+        pattern := "%" + req.Search + "%"
+        args = append(args, pattern, pattern)
+    }
 
-	baseQuery += " ORDER BY " + req.SortField + " " + req.SortOrder + " , product_id ASC"
+    // --- Build ORDER ---
+    orderClause := " ORDER BY " + req.SortField + " " + req.SortOrder + ", product_id ASC"
 
-	err := r.db.SelectContext(ctx, &products, baseQuery, args...)
-	if err != nil {
-		return nil, 0, err
-	}
+    // --- Main query with LIMIT/OFFSET ---
+    query := `
+        SELECT product_id, name, value, weight, image, description
+        FROM products
+    ` + whereClause + orderClause + " LIMIT ? OFFSET ?"
 
-	total := len(products)
-	start := req.Offset
-	end := req.Offset + req.PageSize
-	if start > total {
-		start = total
-	}
-	if end > total {
-		end = total
-	}
-	pagedProducts := products[start:end]
+    argsForSelect := append(append([]interface{}{}, args...), req.PageSize, req.Offset)
 
-	return pagedProducts, total, nil
+    query = r.db.Rebind(query)
+
+    err := r.db.SelectContext(ctx, &products, query, argsForSelect...)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    // --- COUNT(*) ---
+    countQuery := "SELECT COUNT(*) FROM products" + whereClause
+    countQuery = r.db.Rebind(countQuery)
+
+    var total int
+    err = r.db.GetContext(ctx, &total, countQuery, args...)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    return products, total, nil
 }
